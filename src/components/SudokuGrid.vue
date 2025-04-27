@@ -9,16 +9,16 @@ const props = defineProps<{
 }>();
 
 const emits = defineEmits<{
-  onTap: [index: Index, number: number];
+  tap: [index: Index, number: number];
 }>();
 
-const emitOnTap = (index: Index, number: number) => emits("onTap", index, number);
+const emitOnTap = (index: Index, number: number) => emits("tap", index, number);
 
 const lastAction = computed(() => props.actions[props.actions.length - 1]);
 const highlightTuple = computed(() => {
   const action = lastAction.value;
   if (action == null) {
-    return [[] as Index[], [] as Index[], [] as Index[], null];
+    return [[] as Index[], [] as Index[], [] as Index[], null] as const;
   }
 
   const actionType = action.action;
@@ -77,12 +77,9 @@ const highlightTuple = computed(() => {
   return [yellow, red, blue, highlighted] as const;
 });
 
-const yellow = computed(() => highlightTuple.value[0]!);
-const red = computed(() => highlightTuple.value[1]!);
-const blue = computed(() => highlightTuple.value[2]!);
-const highlighted = computed(() => highlightTuple.value[3]);
-
 const highlights = computed(() => {
+  const [yellow, red, blue, highlighted] = highlightTuple.value;
+
   const highlights: Map<`${number}-${number}`, ("red" | "yellow" | "blue" | "highlighted")[]> =
     new Map();
 
@@ -91,16 +88,16 @@ const highlights = computed(() => {
       const key = `${y}-${x}` as const;
       const props = [] as ("red" | "yellow" | "blue" | "highlighted")[];
 
-      if (red.value.some(([cy, cx]) => cy == y && cx == x)) {
+      if (red.some(([cy, cx]) => cy == y && cx == x)) {
         props.push("red");
       }
-      if (blue.value.some(([cy, cx]) => cy == y && cx == x)) {
+      if (blue.some(([cy, cx]) => cy == y && cx == x)) {
         props.push("blue");
       }
-      if (yellow.value.some(([cy, cx]) => cy == y && cx == x) && !props.includes("blue")) {
+      if (yellow.some(([cy, cx]) => cy == y && cx == x) && !props.includes("blue")) {
         props.push("yellow");
       }
-      if (highlighted.value != null && highlighted.value[0] == y && highlighted.value[1] == x) {
+      if (highlighted != null && highlighted[0] == y && highlighted[1] == x) {
         props.length = 0;
         props.push("highlighted");
       }
@@ -147,11 +144,11 @@ const removeds = computed(() => {
 
 <template>
   <div class="container">
-    <template v-for="(row, y) in props.gameGrid">
+    <template v-for="(row, y) in props.gameGrid" :key="y">
       <div class="row">
         <SudokuTile
           v-for="(tile, x) in row"
-          @on-tap="emitOnTap"
+          @tap="emitOnTap"
           :id="[y, x]"
           :key="`${y}-${x}`"
           :added="addeds.get(`${y}-${x}`)"

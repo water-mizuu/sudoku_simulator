@@ -28,7 +28,6 @@ const action = computed(() => props.action);
   padding: 0.5rem;
   background-color: rgb(227, 232, 255);
   border-radius: 4px;
-  overflow-y: scroll;
 }
 
 .container-blue .title {
@@ -38,7 +37,6 @@ const action = computed(() => props.action);
   padding: 0.5rem;
   background-color: rgb(255, 227, 227);
   border-radius: 4px;
-  overflow-y: scroll;
 }
 
 .container-red .title {

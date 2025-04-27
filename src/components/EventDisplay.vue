@@ -35,7 +35,6 @@ const tried = props.event.tried;
   padding: 0.5rem;
   background-color: rgb(227, 232, 255);
   border-radius: 4px;
-  overflow-y: scroll;
 }
 
 .label {

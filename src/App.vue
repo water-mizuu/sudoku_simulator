@@ -10,9 +10,11 @@ import MainScreen from "./views/MainScreen.vue";
 
 <style scoped>
 .wrapper {
-  width: 100%;
+  width: 100vw;
   height: 100vh;
   justify-content: center;
   align-items: center;
+
+  overflow-x: hidden;
 }
 </style>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import Controls from "@/components/Controls.vue";
+import Controls from "@/components/ControlPanel.vue";
 import LeftSide from "@/components/LeftSide.vue";
 import RightSide from "@/components/RightSide.vue";
 import SudokuGrid from "@/components/SudokuGrid.vue";
 import { reactive, ref } from "vue";
 
 export type Superposition = number[];
+export type StartingGrid = number[][];
 export type Grid = Superposition[][];
 export type Index = [y: number, x: number];
 export type Removal = [Index, number][];
@@ -40,17 +41,17 @@ export type Action =
 
 const ROW_COUNT = 9;
 const COLUMN_COUNT = 9;
-const START = [
-  [0, 0, 3, 0, 0, 0, 0, 0, 9],
-  [0, 8, 0, 2, 0, 0, 6, 3, 0],
-  [0, 0, 0, 0, 0, 6, 0, 0, 4],
-  [0, 4, 0, 0, 5, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 9, 0],
-  [0, 0, 5, 0, 0, 7, 3, 2, 0],
-  [1, 0, 0, 8, 0, 0, 0, 0, 0],
-  [0, 0, 0, 0, 0, 0, 0, 0, 6],
-  [0, 0, 4, 0, 0, 2, 7, 5, 0],
-];
+const startGrid = ref<StartingGrid>([
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0, 0, 0, 0, 0],
+]);
 
 // Initialize the grid
 const gameGrid = reactive([] as Grid);
@@ -68,6 +69,12 @@ let stopRunning = false;
 
 /// Resets the grid according to the START constant.
 const initGrid = () => {
+  isStarted.value = false;
+  isPaused.value = true;
+  isFinished.value = false;
+  isContinueOnce.value = false;
+  isBacktrackOnce.value = false;
+
   actions.length = 0;
   events.length = 0;
 
@@ -83,8 +90,8 @@ const initGrid = () => {
 
   for (let y = 0; y < ROW_COUNT; ++y) {
     for (let x = 0; x < COLUMN_COUNT; ++x) {
-      if (START[y][x] != 0) {
-        onTap([y, x], START[y][x]);
+      if (startGrid.value[y][x] != 0) {
+        onTap([y, x], startGrid.value[y][x]);
       }
     }
   }
@@ -104,7 +111,7 @@ const splitFilter = <T,>(arr: T[], predicate: (n: T) => boolean) => {
   return [a, b] as [match: T[], reject: T[]];
 };
 
-const onTap = (chosenIndex: Index, chosen: number) => {
+const onTap = (chosenIndex: Index, chosen: number, tried?: number[]) => {
   const removals: [Index, number][] = [];
   const visitedSet = new Set<string>();
   const hasCollapsed: [Index, number][] = [[chosenIndex, chosen]];
@@ -173,13 +180,38 @@ const onTap = (chosenIndex: Index, chosen: number) => {
     }
   }
 
-  return removals;
+  /// Keep track of the indices in the current grid that have collapsed.
+  const collapsedIndices: Index[] = [];
+  for (const [[y, x]] of removals) {
+    if (gameGrid[y][x].length == 1) {
+      collapsedIndices.push([y, x]);
+    }
+  }
+
+  if (tried != null) {
+    events.push({
+      index: chosenIndex,
+      value: chosen,
+      removal: Array.from(removals),
+      collapsedIndices: collapsedIndices,
+      tried: tried.concat(chosen),
+    });
+  }
+
+  actions.push({
+    action: "collapse",
+    index: chosenIndex,
+    value: chosen,
+    affected: aggregateRemovals(removals),
+  });
+
+  return [collapsedIndices, removals] as const;
 };
 
-const aggregateRemovals = (removals: ReturnType<typeof onTap>) => {
+const aggregateRemovals = (removals: ReturnType<typeof onTap>[1]) => {
   const aggregated: [Index, number[]][] = [];
   for (const [[y, x], value] of removals) {
-    let pair = aggregated.filter(([[cy, cx], _]) => y == cy && x == cx)[0];
+    let pair = aggregated.filter(([[cy, cx]]) => y == cy && x == cx)[0];
     if (pair == null) {
       pair = [[y, x], []];
       aggregated.push(pair);
@@ -214,7 +246,27 @@ const onClickPauseOrPlay = async () => {
 };
 
 const onBacktrack = () => {
-  isBacktrackOnce.value = true;
+  if (isStarted.value) {
+    isBacktrackOnce.value = true;
+  } else {
+    /// Manually backtrack.
+
+    if (events.length <= 0) {
+      throw new Error("This has no solution!");
+    }
+
+    const { index, removal } = events.pop()!;
+
+    for (const [[y, x], n] of removal) {
+      gameGrid[y][x].push(n);
+    }
+
+    actions.push({
+      action: "backtrack",
+      index: index,
+      restored: aggregateRemovals(removal),
+    });
+  }
 };
 
 const onStepForward = () => {
@@ -225,7 +277,7 @@ const onSolvePropagation = async () => {
   let indices = [] as Index[];
 
   const chooseBestIndex = () => {
-    let bestIndex = [-1, -1] as [number, number];
+    let bestIndex: Index = [-1, -1];
     let bestLength = Number.POSITIVE_INFINITY;
     for (const index of indices) {
       const [y, x] = index;
@@ -267,11 +319,12 @@ const onSolvePropagation = async () => {
       break outer;
     }
 
-    let backtrack = true;
+    let backtrack = false;
 
     if (!isBacktrackOnce.value) {
       do {
         if (indices.length <= 0) {
+          backtrack = true;
           break outer;
         }
 
@@ -284,41 +337,19 @@ const onSolvePropagation = async () => {
         const viable = superpositions.filter((n) => !tried.includes(n));
         if (viable.length <= 0) {
           /// Perform a backtrack.
+          backtrack = true;
           break;
         }
 
         const chosen = viable[~~(Math.random() * viable.length)];
 
         /// We propagate the changes to the grid.
-        const propagations = onTap(index, chosen);
-
-        /// Keep track of the indices in the current grid that have collapsed.
-        const collapsedIndices: Index[] = [];
-        for (const [[y, x], _] of propagations) {
-          if (gameGrid[y][x].length == 1) {
-            collapsedIndices.push([y, x]);
-          }
-        }
+        const [collapsedIndices, _] = onTap(index, chosen, tried);
 
         /// We remove the collased indices.
         for (const [y, x] of collapsedIndices) {
           indices = indices.filter(([cy, cx]) => !(cy == y && cx == x));
         }
-
-        events.push({
-          index,
-          value: chosen,
-          removal: Array.from(propagations),
-          collapsedIndices: collapsedIndices,
-          tried: tried.concat(chosen),
-        });
-
-        actions.push({
-          action: "collapse",
-          index: index,
-          value: chosen,
-          affected: aggregateRemovals(propagations),
-        });
 
         tried = [];
         tryingIndex = [-1, -1];
@@ -364,6 +395,12 @@ const onSpeedChanged = (v: number) => {
   delayMs.value = Math.max(0, Math.min(1000, 100 + (v - 50) * 4));
 };
 
+const onGridChanged = (grid: StartingGrid) => {
+  startGrid.value = grid;
+
+  initGrid();
+};
+
 initGrid();
 </script>
 
@@ -375,18 +412,18 @@ initGrid();
     </div>
     <div class="expanded row main-body">
       <div class="expanded column side-bar">
-        <LeftSide :actions />
+        <LeftSide :actions @change-grid="onGridChanged" />
       </div>
       <div class="column expanded center-column">
         <div class="card">
-          <SudokuGrid :game-grid="gameGrid" :actions @on-tap="onTap" />
+          <SudokuGrid :game-grid="gameGrid" :actions @tap="(i, n) => onTap(i, n, [])" />
         </div>
         <div class="card">
           <Controls
             :is-started
             :is-paused
             :is-finished
-            :is-backtrack-allowed="events.length > 1"
+            :is-backtrack-allowed="events.length > 0"
             @pause-play="onClickPauseOrPlay"
             @backtrack="onBacktrack"
             @step-forward="onStepForward"

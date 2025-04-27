@@ -33,7 +33,7 @@ const props = defineProps<{
 }>();
 
 const emits = defineEmits<{
-  onTap: [id: Index, chosen: number];
+  tap: [id: Index, chosen: number];
 }>();
 </script>
 
@@ -64,7 +64,7 @@ const emits = defineEmits<{
   >
     <template v-for="n in 9" :key="`available-${n}`">
       <div
-        @click="props.available?.includes(n) ? emits('onTap', id, n) : null"
+        @click="props.available?.includes(n) ? emits('tap', id, n) : null"
         class="clickable"
         :class="{
           invisible: !props.available?.includes(n),
