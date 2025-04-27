@@ -3,7 +3,8 @@ import Controls from "@/components/ControlPanel.vue";
 import LeftSide from "@/components/LeftSide.vue";
 import RightSide from "@/components/RightSide.vue";
 import SudokuGrid from "@/components/SudokuGrid.vue";
-import { reactive, ref } from "vue";
+import { wait as sleep, splitFilter } from "@/utils";
+import { reactive, ref, watch } from "vue";
 
 export type Superposition = number[];
 export type StartingGrid = number[][];
@@ -38,6 +39,15 @@ export type Action =
       index: Index;
       restored: [Index, number[]][];
     };
+export type State =
+  | "idle"
+  | "running"
+  | "continuing"
+  | "paused"
+  | "backtracking_once"
+  | "continuing_once"
+  | "done"
+  | "resetting";
 
 const ROW_COUNT = 9;
 const COLUMN_COUNT = 9;
@@ -59,25 +69,20 @@ const gameGrid = reactive([] as Grid);
 const actions = reactive([] as Action[]);
 const events = reactive([] as Event[]);
 
+const actionCount = ref(0);
+let clicks = 0;
+let indices = [] as Index[];
+let triedIndex = null as null | Index;
+let triedValues = null as null | number[];
+let runningState = null as null | "propagate_min" | "backtrack" | "done";
 const delayMs = ref(100);
-const isStarted = ref(false);
-const isPaused = ref(true);
-const isFinished = ref(false);
-const isContinueOnce = ref(false);
-const isBacktrackOnce = ref(false);
-let stopRunning = false;
+const state = ref("idle" as State);
 
 /// Resets the grid according to the START constant.
 const initGrid = () => {
-  isStarted.value = false;
-  isPaused.value = true;
-  isFinished.value = false;
-  isContinueOnce.value = false;
-  isBacktrackOnce.value = false;
-
+  actionCount.value = 0;
   actions.length = 0;
   events.length = 0;
-
   gameGrid.length = 0;
 
   for (let y = 0; y < ROW_COUNT; ++y) {
@@ -91,27 +96,27 @@ const initGrid = () => {
   for (let y = 0; y < ROW_COUNT; ++y) {
     for (let x = 0; x < COLUMN_COUNT; ++x) {
       if (startGrid.value[y][x] != 0) {
-        onTap([y, x], startGrid.value[y][x]);
+        onTap([y, x], startGrid.value[y][x], undefined, false, false);
+      }
+    }
+  }
+
+  for (let y = 0; y < ROW_COUNT; ++y) {
+    for (let x = 0; x < COLUMN_COUNT; ++x) {
+      if (gameGrid[y][x].length > 1) {
+        indices.push([y, x]);
       }
     }
   }
 };
 
-/// Splits an array into two arrays based on the predicate.
-const splitFilter = <T,>(arr: T[], predicate: (n: T) => boolean) => {
-  const a = [];
-  const b = [];
-  for (const n of arr) {
-    if (predicate(n)) {
-      a.push(n);
-    } else {
-      b.push(n);
-    }
-  }
-  return [a, b] as [match: T[], reject: T[]];
-};
-
-const onTap = (chosenIndex: Index, chosen: number, tried?: number[]) => {
+const onTap = (
+  chosenIndex: Index,
+  chosen: number,
+  tried?: number[],
+  removeIndices = false,
+  recordActions = true,
+) => {
   const removals: [Index, number][] = [];
   const visitedSet = new Set<string>();
   const hasCollapsed: [Index, number][] = [[chosenIndex, chosen]];
@@ -198,12 +203,25 @@ const onTap = (chosenIndex: Index, chosen: number, tried?: number[]) => {
     });
   }
 
-  actions.push({
-    action: "collapse",
-    index: chosenIndex,
-    value: chosen,
-    affected: aggregateRemovals(removals),
-  });
+  if (recordActions) {
+    if (actions.length > 20) {
+      actions.length = 0;
+    }
+
+    actionCount.value += 1;
+    actions.push({
+      action: "collapse",
+      index: chosenIndex,
+      value: chosen,
+      affected: aggregateRemovals(removals),
+    });
+  }
+
+  if (removeIndices) {
+    for (const [y, x] of collapsedIndices) {
+      indices = indices.filter(([cy, cx]) => !(cy == y && cx == x));
+    }
+  }
 
   return [collapsedIndices, removals] as const;
 };
@@ -224,171 +242,49 @@ const aggregateRemovals = (removals: ReturnType<typeof onTap>[1]) => {
 };
 
 const onClickPauseOrPlay = async () => {
-  if (isStarted.value) {
-    isPaused.value = !isPaused.value;
+  console.log(state.value);
+  clicks += 1;
 
-    isContinueOnce.value = false;
-    isBacktrackOnce.value = false;
-  } else if (isFinished.value) {
-    isPaused.value = false;
-    initGrid();
-    isFinished.value = false;
+  const v = state.value;
+  if (v == "idle") {
+    state.value = "running";
+  } else if (v == "running") {
+    state.value = "paused";
+  } else if (v == "paused") {
+    state.value = "running";
+  } else if (v == "done") {
+    state.value = "resetting";
   } else {
-    isStarted.value = true;
-    isFinished.value = false;
-    isPaused.value = false;
-    events.length = 0;
-
-    await onSolvePropagation();
-    isFinished.value = true;
-    isStarted.value = false;
+    throw new Error("Unknown " + v);
   }
+
+  // if (isStarted.value) {
+  //   isPaused.value = !isPaused.value;
+
+  //   isContinueOnce.value = false;
+  //   isBacktrackOnce.value = false;
+  // } else if (isFinished.value) {
+  //   isPaused.value = false;
+  //   initGrid();
+  //   isFinished.value = false;
+  // } else {
+  //   isStarted.value = true;
+  //   isFinished.value = false;
+  //   isPaused.value = false;
+  //   events.length = 0;
+
+  //   await onSolvePropagation();
+  //   isFinished.value = true;
+  //   isStarted.value = false;
+  // }
 };
 
 const onBacktrack = () => {
-  if (isStarted.value) {
-    isBacktrackOnce.value = true;
-  } else {
-    /// Manually backtrack.
-
-    if (events.length <= 0) {
-      throw new Error("This has no solution!");
-    }
-
-    const { index, removal } = events.pop()!;
-
-    for (const [[y, x], n] of removal) {
-      gameGrid[y][x].push(n);
-    }
-
-    actions.push({
-      action: "backtrack",
-      index: index,
-      restored: aggregateRemovals(removal),
-    });
-  }
+  state.value = "backtracking_once";
 };
 
 const onStepForward = () => {
-  isContinueOnce.value = true;
-};
-
-const onSolvePropagation = async () => {
-  let indices = [] as Index[];
-
-  const chooseBestIndex = () => {
-    let bestIndex: Index = [-1, -1];
-    let bestLength = Number.POSITIVE_INFINITY;
-    for (const index of indices) {
-      const [y, x] = index;
-      if (gameGrid[y][x].length < bestLength) {
-        bestIndex = index;
-        bestLength = gameGrid[y][x].length;
-      }
-    }
-
-    return bestIndex;
-  };
-
-  for (let y = 0; y < ROW_COUNT; ++y) {
-    for (let x = 0; x < COLUMN_COUNT; ++x) {
-      if (gameGrid[y][x].length > 1) {
-        indices.push([y, x]);
-      }
-    }
-  }
-  indices.sort(([y1, x1], [y2, x2]) => gameGrid[y1][x1].length - gameGrid[y2][x2].length);
-
-  let tried = [] as number[];
-  let tryingIndex = [-1, -1] as [number, number];
-
-  outer: while (true) {
-    /// We want to ignore the value of [isPaused] when
-    ///   isContinueOnce is raised.
-    if (!(isContinueOnce.value || isBacktrackOnce.value)) {
-      if (isPaused.value) {
-        await new Promise((r) => setTimeout(r, 10));
-
-        continue;
-      }
-    }
-
-    if (stopRunning) {
-      stopRunning = false;
-      initGrid();
-      break outer;
-    }
-
-    let backtrack = false;
-
-    if (!isBacktrackOnce.value) {
-      do {
-        if (indices.length <= 0) {
-          backtrack = true;
-          break outer;
-        }
-
-        const index =
-          tryingIndex[0] != -1 && tryingIndex[1] != -1 //
-            ? tryingIndex
-            : chooseBestIndex();
-
-        const superpositions = gameGrid[index[0]][index[1]];
-        const viable = superpositions.filter((n) => !tried.includes(n));
-        if (viable.length <= 0) {
-          /// Perform a backtrack.
-          backtrack = true;
-          break;
-        }
-
-        const chosen = viable[~~(Math.random() * viable.length)];
-
-        /// We propagate the changes to the grid.
-        const [collapsedIndices, _] = onTap(index, chosen, tried);
-
-        /// We remove the collased indices.
-        for (const [y, x] of collapsedIndices) {
-          indices = indices.filter(([cy, cx]) => !(cy == y && cx == x));
-        }
-
-        tried = [];
-        tryingIndex = [-1, -1];
-
-        backtrack = false;
-      } while (false);
-    }
-
-    isContinueOnce.value = false;
-    isBacktrackOnce.value = false;
-
-    if (backtrack) {
-      if (events.length <= 0) {
-        throw new Error("This has no solution!");
-      }
-
-      const { index, removal, collapsedIndices, tried: previousTried } = events.pop()!;
-      tryingIndex = index;
-      tried = previousTried;
-
-      for (const [[y, x], n] of removal) {
-        gameGrid[y][x].push(n);
-      }
-
-      for (const [y, x] of collapsedIndices) {
-        indices.push([y, x]);
-      }
-
-      actions.push({
-        action: "backtrack",
-        index: index,
-        restored: aggregateRemovals(removal),
-      });
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, delayMs.value));
-  }
-
-  isPaused.value = true;
+  state.value = "continuing_once";
 };
 
 const onSpeedChanged = (v: number) => {
@@ -396,39 +292,191 @@ const onSpeedChanged = (v: number) => {
 };
 
 const onGridChanged = (grid: StartingGrid) => {
+  clicks += 1;
+  runningState = null;
+  indices = [];
+  triedIndex = null;
+  triedValues = null;
+  runningState = null;
+
+  state.value = "idle";
   startGrid.value = grid;
 
   initGrid();
 };
 
 initGrid();
+
+const chooseBestIndex = () => {
+  let bestIndex: Index = [-1, -1];
+  let bestLength = Number.POSITIVE_INFINITY;
+  for (const index of indices) {
+    const [y, x] = index;
+    if (gameGrid[y][x].length < bestLength) {
+      bestIndex = index;
+      bestLength = gameGrid[y][x].length;
+    }
+  }
+
+  return bestIndex;
+};
+
+const propagate = () => {
+  if (indices.length <= 0) {
+    runningState = "done";
+    return;
+  }
+
+  const index = triedIndex != null ? triedIndex : chooseBestIndex();
+
+  const superpositions = gameGrid[index[0]][index[1]];
+  const viable = superpositions.filter((n) => triedValues == null || !triedValues.includes(n));
+  if (viable.length <= 0) {
+    /// Perform a backtrack.
+    runningState = "backtrack";
+    return;
+  }
+
+  const chosen = viable[~~(Math.random() * viable.length)];
+
+  /// We propagate the changes to the grid.
+  onTap(index, chosen, triedValues ?? [], true);
+
+  triedValues = null;
+  triedIndex = null;
+  return;
+};
+
+const backtrack = () => {
+  if (events.length <= 0) {
+    alert("This has no solution!");
+    throw new Error("This has no solution!");
+  }
+
+  const { index, removal, collapsedIndices, tried } = events.pop()!;
+  triedIndex = index;
+  triedValues = tried;
+
+  for (const [[y, x], n] of removal) {
+    gameGrid[y][x].push(n);
+  }
+
+  for (const [y, x] of collapsedIndices) {
+    indices.push([y, x]);
+  }
+
+  if (actions.length > 20) {
+    actions.length = 0;
+  }
+
+  actionCount.value += 1;
+  actions.push({
+    action: "backtrack",
+    index: index,
+    restored: aggregateRemovals(removal),
+  });
+
+  runningState = "propagate_min";
+};
+
+watch(state, async (now) => {
+  if (now == "continuing") {
+    state.value = "running";
+  } else if (now == "running") {
+    const copy = clicks;
+
+    switch (runningState) {
+      case null:
+        runningState = "propagate_min";
+
+        break;
+      case "propagate_min": {
+        propagate();
+        break;
+      }
+      case "backtrack": {
+        backtrack();
+        break;
+      }
+      case "done": {
+        runningState = null;
+        state.value = "done";
+        break;
+      }
+    }
+
+    if (state.value != "done") {
+      await sleep(delayMs.value);
+      if (copy == clicks) {
+        state.value = "continuing";
+      }
+    }
+  } else if (now == "resetting") {
+    actionCount.value = 0;
+    indices = [];
+    triedIndex = null;
+    triedValues = null;
+    runningState = null;
+
+    initGrid();
+
+    state.value = "idle";
+  } else if (now == "backtracking_once") {
+    backtrack();
+
+    state.value = "idle";
+  } else if (now == "continuing_once") {
+    console.log("Propagating");
+    propagate();
+
+    if (runningState == "backtrack") {
+      backtrack();
+    } else if (runningState == "done") {
+      runningState = null;
+
+      state.value = "done";
+    }
+
+    if (state.value != "done") {
+      state.value = "idle";
+    }
+  } else {
+    console.log({ now });
+  }
+});
 </script>
 
 <template>
   <div class="screen column">
-    <div class="column flex-shrink">
+    <div class="column-shrink">
       <p class="title">Sudoku Solver Visualization</p>
       <p>Wave Function Collapse with Backtracking</p>
     </div>
     <div class="expanded row main-body">
       <div class="expanded column side-bar">
-        <LeftSide :actions @change-grid="onGridChanged" />
+        <LeftSide :actions :action-count @change-grid="onGridChanged" />
       </div>
       <div class="column expanded center-column">
-        <div class="card">
-          <SudokuGrid :game-grid="gameGrid" :actions @tap="(i, n) => onTap(i, n, [])" />
+        <div class="card sudoku-holder">
+          <SudokuGrid :game-grid="gameGrid" :actions @tap="(i, n) => onTap(i, n, [], true)" />
         </div>
         <div class="card">
           <Controls
-            :is-started
-            :is-paused
-            :is-finished
+            :state="state"
             :is-backtrack-allowed="events.length > 0"
             @pause-play="onClickPauseOrPlay"
             @backtrack="onBacktrack"
             @step-forward="onStepForward"
             @speed-changed="onSpeedChanged"
           />
+        </div>
+        <div style="text-align: center">
+          <p>Zuniga</p>
+          <p>
+            Sample puzzles are taken from
+            <a href="https://sandiway.arizona.edu/"> https://sandiway.arizona.edu/</a>
+            .
+          </p>
         </div>
       </div>
       <div class="expanded column side-bar">
@@ -447,6 +495,12 @@ initGrid();
 </style>
 
 <style scoped>
+.sudoku-holder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .screen {
   width: 100%;
   height: 100%;

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import type { State } from "@/views/MainScreen.vue";
+
 const props = defineProps<{
-  isStarted: boolean;
-  isPaused: boolean;
-  isFinished: boolean;
+  state: State;
 
   isBacktrackAllowed: boolean;
 }>();
@@ -21,25 +21,33 @@ const emit = defineEmits<{
       <button class="play" @click="emit('pausePlay')">
         <span class="icon">send</span>
         {{
-          props.isFinished
-            ? "Reset"
-            : props.isStarted
-              ? props.isPaused
-                ? "Resume"
-                : "Pause"
-              : "Start"
+  state == "paused"
+    ? "Resume"
+    : state == "idle"
+      ? "Start"
+      : state == "done"
+        ? "Reset"
+        : state == "running"
+          ? "Pause"
+          : (() => {
+            console.log(state);
+            return "UNKNOWN";
+          }) ()
         }}
       </button>
       <button @click="emit('backtrack')" :disabled="!props.isBacktrackAllowed">Backtrack</button>
       <button @click="emit('stepForward')">Step Forward</button>
     </div>
-    <input
-      min="1"
-      max="100"
-      type="range"
-      class="slider"
-      @change="(e) => emit('speedChanged', Number((e.target as HTMLInputElement).value))"
-    />
+    <div class="column-shrink">
+      <input
+        min="1"
+        max="100"
+        type="range"
+        class="slider"
+        @change="(e) => emit('speedChanged', Number((e.target as HTMLInputElement).value))"
+      />
+      <p style="text-align: center">Step delay</p>
+    </div>
   </div>
 </template>
 

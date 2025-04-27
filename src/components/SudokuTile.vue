@@ -96,20 +96,21 @@ const emits = defineEmits<{
   display: grid;
 
   /* I gave up */
-  width: 4rem;
-  height: 4rem;
+  width: 3.5rem;
+  height: 3.5rem;
 }
 
 .collapsed.container {
   display: flex;
   place-content: center;
   place-items: center;
-  font-size: 1.75rem;
+  font-size: 1.5rem;
 }
 
 .uncollapsed.container {
   grid-template-columns: repeat(3, auto);
   grid-template-rows: repeat(3, auto);
+  font-size: 12px;
 }
 
 .clickable {

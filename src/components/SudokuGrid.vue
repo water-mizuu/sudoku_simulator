@@ -145,21 +145,46 @@ const removeds = computed(() => {
 <template>
   <div class="container">
     <template v-for="(row, y) in props.gameGrid" :key="y">
-      <div class="row">
-        <SudokuTile
-          v-for="(tile, x) in row"
-          @tap="emitOnTap"
-          :id="[y, x]"
-          :key="`${y}-${x}`"
-          :added="addeds.get(`${y}-${x}`)"
-          :removed="removeds.get(`${y}-${x}`)"
-          :highlights="highlights.get(`${y}-${x}`)"
-          :state="tile.length == 0 ? 'empty' : tile.length == 1 ? 'collapsed' : 'uncollapsed'"
-          :value="tile.length == 1 ? tile[0] : null"
-          :available="tile.length > 1 ? tile : null"
-          class="tile expanded"
-        />
-
+      <div class="row grid-row">
+        <div class="left-label" :class="{ shifted: y == 0 }">R{{ y }}</div>
+        <div v-for="(tile, x) in row" :key="`${y}-${x}`" class="row">
+          <div v-if="y == 0" class="column-shrink tile-holder">
+            <div class="top-label">C{{ x }}</div>
+            <SudokuTile
+              @tap="emitOnTap"
+              :id="[y, x]"
+              :added="addeds.get(`${y}-${x}`)"
+              :removed="removeds.get(`${y}-${x}`)"
+              :highlights="highlights.get(`${y}-${x}`)"
+              :state="tile.length == 0 ? 'empty' : tile.length == 1 ? 'collapsed' : 'uncollapsed'"
+              :value="tile.length == 1 ? tile[0] : null"
+              :available="tile.length > 1 ? tile : null"
+              class="tile expanded"
+              :class="{
+                [`tile${y}-${x}`]: true,
+                [`row-${y}`]: true,
+                [`column-${x}`]: true,
+              }"
+            />
+          </div>
+          <SudokuTile
+            v-else
+            @tap="emitOnTap"
+            :id="[y, x]"
+            :added="addeds.get(`${y}-${x}`)"
+            :removed="removeds.get(`${y}-${x}`)"
+            :highlights="highlights.get(`${y}-${x}`)"
+            :state="tile.length == 0 ? 'empty' : tile.length == 1 ? 'collapsed' : 'uncollapsed'"
+            :value="tile.length == 1 ? tile[0] : null"
+            :available="tile.length > 1 ? tile : null"
+            class="tile expanded"
+            :class="{
+              [`tile${y}-${x}`]: true,
+              [`row-${y}`]: true,
+              [`column-${x}`]: true,
+            }"
+          />
+        </div>
       </div>
     </template>
   </div>
@@ -170,46 +195,66 @@ const removeds = computed(() => {
   aspect-ratio: 1;
 }
 
-.row:first-child > .tile:first-child {
+.left-label {
+  padding-right: 8px;
+}
+
+.top-label {
+  padding-bottom: 8px;
+}
+
+.grid-row {
+  align-items: center;
+}
+
+.tile-holder {
+  align-items: center;
+}
+
+.shifted {
+  position: relative;
+  top: 12px;
+}
+
+.tile0-0 {
   border-radius: 4px 0px 0px 0px;
 }
-.row:first-child > .tile:last-child {
+
+.tile0-8 {
   border-radius: 0px 4px 0px 0px;
 }
 
-.row:last-child > .tile:last-child {
+.tile8-8 {
   border-radius: 0px 0px 4px 0px;
 }
 
-.row:last-child > .tile:first-child {
+.tile8-0 {
   border-radius: 0px 0px 0px 4px;
 }
 
-.row:first-child > .tile,
-.row:nth-child(4) > .tile,
-.row:nth-child(7) > .tile {
-  border-top: 1px solid black;
+.column-0 {
+  border-left: 1px black solid
 }
 
-.row:last-child > .tile {
-  border-bottom: 1px solid black;
+.column-2, .column-5, .column-8 {
+  border-right: 1px black solid;
 }
 
-.tile:first-child {
-  border-left: 1px solid black;
+.column-0, .column-1, .column-3, .column-4, .column-6, .column-7 {
+  border-right: 1px grey solid;
 }
 
-.tile:last-child,
-.tile:nth-child(3),
-.tile:nth-child(6) {
-  border-right: 1px solid black;
+.row-0 {
+  border-top: 1px black solid;
 }
 
-.row:not(:nth-child(3), :nth-child(6), :last-child) > .tile {
-  border-bottom: 1px solid #b5b5b5;
+.row-2, .row-5, .row-8 {
+  border-bottom: 1px black solid;
 }
 
-.tile:not(:nth-child(3), :nth-child(6), :last-child) {
-  border-right: 1px solid #b5b5b5;
+
+.row-0, .row-1, .row-3, .row-4, .row-6, .row-7 {
+  border-bottom: 1px grey solid;
 }
+
 </style>

@@ -5,6 +5,7 @@ import { onMounted, ref, watch } from "vue";
 
 const props = defineProps<{
   actions: Action[];
+  actionCount: number;
 }>();
 
 const emits = defineEmits<{
@@ -23,7 +24,7 @@ const grids: Record<string, StartingGrid> = {
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0],
   ],
-  Difficult: [
+  "Medium -- Benchmark": [
     [0, 0, 3, 0, 0, 0, 0, 0, 9],
     [0, 8, 0, 2, 0, 0, 6, 3, 0],
     [0, 0, 0, 0, 0, 6, 0, 0, 4],
@@ -33,6 +34,50 @@ const grids: Record<string, StartingGrid> = {
     [1, 0, 0, 8, 0, 0, 0, 0, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 6],
     [0, 0, 4, 0, 0, 2, 7, 5, 0],
+  ],
+  "January 19th 'Diabolical'": [
+    [0, 2, 0, 6, 0, 8, 0, 0, 0],
+    [5, 8, 0, 0, 0, 9, 7, 0, 0],
+    [0, 0, 0, 0, 4, 0, 0, 0, 0],
+    [3, 7, 0, 0, 0, 0, 5, 0, 0],
+    [6, 0, 0, 0, 0, 0, 0, 0, 4],
+    [0, 0, 0, 0, 0, 0, 0, 1, 3],
+    [0, 0, 0, 0, 2, 0, 0, 0, 0],
+    [0, 0, 9, 8, 0, 0, 0, 3, 6],
+    [0, 0, 0, 3, 0, 6, 0, 9, 0],
+  ],
+  "Vegard Hanssen Puzzle 2155141": [
+    [0, 0, 0, 6, 0, 0, 4, 0, 0],
+    [7, 0, 0, 0, 0, 3, 6, 0, 0],
+    [0, 0, 0, 0, 9, 1, 0, 8, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 5, 0, 1, 8, 0, 0, 0, 3],
+    [0, 0, 0, 3, 0, 6, 0, 4, 5],
+    [0, 4, 0, 2, 0, 0, 0, 6, 0],
+    [9, 0, 3, 0, 0, 0, 0, 0, 0],
+    [0, 2, 0, 0, 0, 0, 1, 0, 0],
+  ],
+  "Challenge 1 -- Logic": [
+    [0, 2, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 6, 0, 0, 0, 0, 3],
+    [0, 7, 4, 0, 8, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 3, 0, 0, 2],
+    [0, 8, 0, 0, 4, 0, 0, 1, 0],
+    [6, 0, 0, 5, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 1, 0, 7, 8, 0],
+    [5, 0, 0, 0, 0, 9, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 4, 0],
+  ],
+  "Uunsolvable #2": [
+    [0, 0, 0, 3, 0, 2, 0, 0, 0],
+    [0, 5, 0, 7, 9, 8, 0, 3, 0],
+    [0, 0, 7, 0, 0, 0, 8, 0, 0],
+    [0, 0, 8, 6, 0, 7, 3, 0, 0],
+    [0, 7, 0, 0, 0, 0, 0, 6, 0],
+    [0, 0, 3, 5, 0, 4, 1, 0, 0],
+    [0, 0, 5, 0, 0, 0, 6, 0, 0],
+    [0, 2, 0, 4, 1, 9, 0, 5, 0],
+    [0, 0, 0, 8, 0, 6, 0, 0, 0],
   ],
 };
 
@@ -61,13 +106,13 @@ watch(props.actions, () => {
   <div class="card">
     <h3>Current Action</h3>
 
-    <ActionDisplay :action="props.actions[displayedAction]" />
+    <ActionDisplay :action="props.actions[displayedAction]" :action-count />
   </div>
 
-  <div class="card">
+  <div class="card column" style="height: unset; gap: 1rem">
     <h3>Starting Grid</h3>
 
-    <select id="cars" name="cars"  @change="onGridChange">
+    <select id="cars" name="cars" @change="onGridChange">
       <option v-for="[key, value] in Object.entries(grids)" :key="key" :value="key">
         {{ key }}
       </option>

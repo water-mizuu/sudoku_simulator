@@ -22,20 +22,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="expanded column card" ref="card">
-    <h3>Current Event Stack</h3>
-
+  <div class="parent expanded column card" ref="card">
+    <h3>Current Placement Sequence</h3>
     <TransitionGroup class="event-holder" name="list" tag="ul">
       <li v-for="(event, i) in props.events" :key="i">
-        <EventDisplay :event />
+        <EventDisplay :event :index="i + 1" :total-length="props.events.length" />
       </li>
     </TransitionGroup>
   </div>
 </template>
 
 <style scoped>
-.container {
-  height: 100%;
+.parent {
+  gap: 1rem;
 }
 
 .event-holder {
