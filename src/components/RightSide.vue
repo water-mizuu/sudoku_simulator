@@ -41,7 +41,7 @@ onMounted(() => {
   height: 100%;
   list-style-type: none;
   list-style-position: inside;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 

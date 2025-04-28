@@ -3,6 +3,7 @@ import Controls from "@/components/ControlPanel.vue";
 import LeftSide from "@/components/LeftSide.vue";
 import RightSide from "@/components/RightSide.vue";
 import SudokuGrid from "@/components/SudokuGrid.vue";
+import { LinkedList } from "@/linked_list";
 import { wait as sleep, splitFilter } from "@/utils";
 import { reactive, ref, watch } from "vue";
 
@@ -66,7 +67,7 @@ const startGrid = ref<StartingGrid>([
 // Initialize the grid
 const gameGrid = reactive([] as Grid);
 
-const actions = reactive([] as Action[]);
+const actions = reactive(new LinkedList() as LinkedList<Action>);
 const events = reactive([] as Event[]);
 
 const actionCount = ref(0);
@@ -81,7 +82,7 @@ const state = ref("idle" as State);
 /// Resets the grid according to the START constant.
 const initGrid = () => {
   actionCount.value = 0;
-  actions.length = 0;
+  actions.clear();
   events.length = 0;
   gameGrid.length = 0;
 
@@ -204,12 +205,8 @@ const onTap = (
   }
 
   if (recordActions) {
-    if (actions.length > 20) {
-      actions.length = 0;
-    }
-
     actionCount.value += 1;
-    actions.push({
+    actions.add({
       action: "collapse",
       index: chosenIndex,
       value: chosen,
@@ -365,12 +362,8 @@ const backtrack = () => {
     indices.push([y, x]);
   }
 
-  if (actions.length > 20) {
-    actions.length = 0;
-  }
-
   actionCount.value += 1;
-  actions.push({
+  actions.add({
     action: "backtrack",
     index: index,
     restored: aggregateRemovals(removal),
@@ -471,7 +464,7 @@ watch(state, async (now) => {
           />
         </div>
         <div style="text-align: center">
-          <p>Zuniga</p>
+          <p>Made by <b>water-mizuu</b>.</p>
           <p>
             Sample puzzles are taken from
             <a href="https://sandiway.arizona.edu/"> https://sandiway.arizona.edu/</a>

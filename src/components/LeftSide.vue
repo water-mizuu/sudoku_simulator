@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import ActionDisplay from "@/components/ActionDisplay.vue";
+import type { LinkedList } from "@/linked_list";
 import type { Action, StartingGrid } from "@/views/MainScreen.vue";
 import { onMounted, ref, watch } from "vue";
 
 const props = defineProps<{
-  actions: Action[];
+  actions: LinkedList<Action>;
   actionCount: number;
 }>();
 
@@ -97,16 +98,16 @@ onMounted(() => {
   emits("changeGrid", grids["Blank"]);
 });
 
-watch(props.actions, () => {
-  displayedAction.value = props.actions.length - 1;
-});
+// watch(props.actions, () => {
+//   displayedAction.value = props.actions.length - 1;
+// });
 </script>
 
 <template>
   <div class="card">
     <h3>Current Action</h3>
 
-    <ActionDisplay :action="props.actions[displayedAction]" :action-count />
+    <ActionDisplay :action="props.actions.first" :action-count />
   </div>
 
   <div class="card column" style="height: unset; gap: 1rem">

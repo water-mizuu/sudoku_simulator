@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { LinkedList } from "@/linked_list";
 import type { Action, Grid, Index } from "@/views/MainScreen.vue";
 import { computed } from "vue";
 import SudokuTile from "./SudokuTile.vue";
 
 const props = defineProps<{
   gameGrid: Grid;
-  actions: Action[];
+  actions: LinkedList<Action>;
 }>();
 
 const emits = defineEmits<{
@@ -14,7 +15,7 @@ const emits = defineEmits<{
 
 const emitOnTap = (index: Index, number: number) => emits("tap", index, number);
 
-const lastAction = computed(() => props.actions[props.actions.length - 1]);
+const lastAction = computed(() => props.actions.first);
 const highlightTuple = computed(() => {
   const action = lastAction.value;
   if (action == null) {
@@ -147,7 +148,7 @@ const removeds = computed(() => {
     <template v-for="(row, y) in props.gameGrid" :key="y">
       <div class="row grid-row">
         <div class="left-label" :class="{ shifted: y == 0 }">R{{ y }}</div>
-        <div v-for="(tile, x) in row" :key="`${y}-${x}`" class="row">
+        <div v-for="(tile, x) in row" :key="`${y}-${x}`">
           <div v-if="y == 0" class="column-shrink tile-holder">
             <div class="top-label">C{{ x }}</div>
             <SudokuTile
@@ -196,6 +197,7 @@ const removeds = computed(() => {
 }
 
 .left-label {
+  width: 2rem;
   padding-right: 8px;
 }
 
@@ -205,6 +207,7 @@ const removeds = computed(() => {
 
 .grid-row {
   align-items: center;
+  justify-content: space-between;
 }
 
 .tile-holder {
@@ -233,14 +236,21 @@ const removeds = computed(() => {
 }
 
 .column-0 {
-  border-left: 1px black solid
+  border-left: 1px black solid;
 }
 
-.column-2, .column-5, .column-8 {
+.column-2,
+.column-5,
+.column-8 {
   border-right: 1px black solid;
 }
 
-.column-0, .column-1, .column-3, .column-4, .column-6, .column-7 {
+.column-0,
+.column-1,
+.column-3,
+.column-4,
+.column-6,
+.column-7 {
   border-right: 1px grey solid;
 }
 
@@ -248,13 +258,18 @@ const removeds = computed(() => {
   border-top: 1px black solid;
 }
 
-.row-2, .row-5, .row-8 {
+.row-2,
+.row-5,
+.row-8 {
   border-bottom: 1px black solid;
 }
 
-
-.row-0, .row-1, .row-3, .row-4, .row-6, .row-7 {
+.row-0,
+.row-1,
+.row-3,
+.row-4,
+.row-6,
+.row-7 {
   border-bottom: 1px grey solid;
 }
-
 </style>
