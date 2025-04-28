@@ -7,7 +7,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/<REPO>/",
+  base: "/sudoku_simulator/",
   plugins: [
     vue(),
     vueJsx(),
